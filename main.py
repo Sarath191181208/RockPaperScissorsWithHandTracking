@@ -1,13 +1,15 @@
 import cv2
 import pygame
-import handTracker as hT
 import random
 import time
 import os
 
-WIDTH, HEIGHT = (600, 400)
+import handTracker as hT
+from timer import Timer 
+
+WIDTH, HEIGHT = (900, 400)
 pygame.init()
-FPS = 20
+FPS = 60
 # 250x220
 paper = pygame.image.load(os.path.join('Assets', 'paper.jpg'))
 rock = pygame.image.load(os.path.join('Assets', 'rock.jpg'))
@@ -21,10 +23,10 @@ pygame.display.set_caption("Rock Paper Scissors")
 YELLOW = (255, 235, 0)
 BLACK = (0, 0, 0)
 
-playerPosition = (25, 95)
-computerPosition: tuple[int, int] = (325, 95)
-playerTextPosition = (60, 10)
-computerTextPosition = (350, 10)
+playerPosition = (300+25, 95)
+computerPosition: tuple[int, int] = (300+325, 95)
+playerTextPosition = (300+60, 10)
+computerTextPosition = (300+350, 10)
 
 detector = hT.HandDetector(detectionCon=0.8)
 cap = cv2.VideoCapture(0)
@@ -51,11 +53,9 @@ def draw(playerIMG=paper, computerIMG=rock, playerScore: int = 0, computerScore:
     WIN.blit(computerIMG, computerPosition)
     WIN.blit(text("player : " + str(playerScore)), playerTextPosition)
     WIN.blit(text("computer : " + str(computerScore)), computerTextPosition)
-    pygame.display.update()
 
 
 def main():
-    draw()
     clock = pygame.time.Clock()
     run = True
     # if true computer chooses a random value
@@ -67,17 +67,49 @@ def main():
     computerScore = 0
     # keeps track of fps
     previousTime = 0
+    timer = Timer(3)
+
+    computerChoice = scissors
+    comChoiceStr = ''
+
+    playerChoice = paper
+    playerChoiceStr = ""
+
     while run:
         clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
 
-        success, img = cap.read()
+        _, img = cap.read()
         img = detector.findHands(img)
         lmList = detector.findPosition(img)
         fingers = detector.countFingers(lmList, True)
-        if compChose:
+
+        if timer.start:
+            # font
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            
+            # org
+            org = (300,300)
+            
+            # fontScale
+            fontScale = 5
+            
+            # Blue color in BGR
+            color = (255, 0, 0)
+            
+            # Line thickness of 2 px
+            thickness = 2
+            
+            # Using cv2.putText() method
+            
+            img = cv2.putText(img, str(int(abs(timer.current-timer.start_time))), org, font, 
+                            fontScale, color, thickness, cv2.LINE_AA)
+
+        if compChose and not timer.start:
+            
+            compChose = False
 
             rand = random.randint(1, 3)
             computerChoice = scissors
@@ -92,20 +124,21 @@ def main():
             else:
                 computerChoice = scissors
                 comChoiceStr = 'scissors'
-            compChose = False
+
             # runs until a hand is found
             while not len(lmList):
-                success, img = cap.read()
+                _, img = cap.read()
                 img = detector.findHands(img)
                 lmList = detector.findPosition(img)
+
             fingers = detector.countFingers(lmList, True)
             playerChoice = rock
             playerChoiceStr = ""
 
-            if fingers == 0:
+            if 0 <= fingers < 2:
                 playerChoice = rock
                 playerChoiceStr = "rock"
-            elif 1 < fingers < 4:
+            elif 2 <= fingers < 4:
                 playerChoice = scissors
                 playerChoiceStr = "scissors"
             else:
@@ -116,15 +149,27 @@ def main():
                 playerScore += 1
             else:
                 computerScore += 1
-            draw(playerChoice, computerChoice, playerScore, computerScore)
 
         if not fingers and len(lmList):
             if lmList[4][2] < bound:
                 compChose = True
-                time.sleep(1.5)
-        previousTime = showFPS(previousTime, img)
-        cv2.imshow("Image", img)
+                timer.start_timer()
+
+        # previousTime = showFPS(previousTime, img)
+
+        timer.update()
+
+        img = cv2.line(img,(0,bound), (1000,bound), (255,0,0), 1)
+        # cv2.imshow("Image", img)
+        draw(playerChoice, computerChoice, playerScore, computerScore)
+        height, width, _ = img.shape
+
+        img = pygame.image.frombuffer(img.tobytes(), (width, height), "BGR")
+        WIN.blit(pygame.transform.scale(img,(300,400)), (0, 0))
+        pygame.display.update()
+
         cv2.waitKey(1)
+
     pygame.quit()
 
 
